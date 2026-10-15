@@ -11,6 +11,13 @@ contacto con hardware. El servidor HTTP está escrito a mano sobre sockets, sin 
 
 > La presión marca unos 847 hPa porque Guadalajara está a ~1,560 m sobre el nivel del mar.
 
+## Un driver hecho a mano
+
+El sensor de presión también debía medir humedad, pero compramos el modelo equivocado: un BMP180,
+que mide presión y temperatura, pero no humedad (esa quedó a cargo del DHT11). Además era tan viejo
+que no encontré un driver que me funcionara en MicroPython. Escribí el mío con ayuda de
+ChatGPT, partiendo del driver de un modelo más reciente, y funcionó muy bien.
+
 ## Qué hace
 
 - Lee el DHT11 (temperatura y humedad), el BMP180 por I2C (presión) y el YL-38 (lluvia).
@@ -52,8 +59,9 @@ contacto con hardware. El servidor HTTP está escrito a mano sobre sockets, sin 
 
 1. Flashea [MicroPython](https://micropython.org/download/ESP32_GENERIC/) en el ESP32.
 2. Copia `config.example.py` como `config.py` y pon el nombre y contraseña de tu red.
-3. Consigue un driver `bmp180.py` para MicroPython (por ejemplo el de
-   [micropython-IMU](https://github.com/micropython-IMU/micropython-bmp180)); `dht` ya viene en el firmware.
+3. Consigue un driver `bmp180.py` para MicroPython. El mío no está en este repo; el de
+   [micropython-IMU](https://github.com/micropython-IMU/micropython-bmp180) usa la misma interfaz
+   (`BMP180(i2c)`, `.pressure`, `.temperature`). `dht` ya viene en el firmware.
 4. Sube los archivos a la placa:
 
    ```bash
