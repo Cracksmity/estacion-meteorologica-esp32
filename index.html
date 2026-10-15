@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Estación meteorológica ESP32</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #020617;
+        color: #e5e7eb;
+    }
+
+    header {
+        text-align: center;
+        padding: 16px 0 8px 0;
+    }
+
+    .container {
+        max-width: 1100px;
+        width: 100%;
+        margin: 0 auto;              /* centra todo */
+        padding: 0 16px 16px 16px;
+        box-sizing: border-box;
+    }
+    .emergency-banner {
+        display: none;
+        background: #7f1d1d;
+        border-radius: 10px;
+        padding: 8px 12px;
+        margin-bottom: 12px;
+        border: 1px solid #fecaca;
+        text-align: center;
+        font-size: 0.9rem;
+    }
+    .emergency-banner span {
+        font-weight: 600;
+    }
+    .summary-card {
+        background: radial-gradient(circle at top left, #1d4ed8, #020617);
+        border-radius: 16px;
+        padding: 16px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+        box-shadow: 0 18px 40px rgba(15,23,42,0.9);
+    }
+    .summary-item {
+        text-align: center;
+    }
+    .label {
+        font-size: 0.85rem;
+        color: #cbd5f5;
+    }
+    .value {
+        font-size: 1.4rem;
+        font-weight: 600;
+    }
+    .rain-status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .rain-emoji {
+        font-size: 2rem;
+        margin-bottom: 4px;
+    }
+    .control-card {
+        background: #020617;
+        border-radius: 12px;
+        padding: 10px 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        border: 1px solid #1f2937;
+        margin-bottom: 12px;
+        font-size: 0.9rem;
+    }
+    .control-title {
+        margin: 0 0 6px 0;
+        color: #9ca3af;
+    }
+    .control-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .control-btn {
+        border: none;
+        padding: 6px 10px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        min-width: 150px;
+    }
+    .control-btn.on {
+        background: #22c55e;
+        color: #022c22;
+    }
+    .control-btn.off {
+        background: #6b7280;
+        color: #e5e7eb;
+    }
+    .control-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));  /* SIEMPRE 3 columnas en escritorio */
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .chart-card {
+        background: #020617;
+        border-radius: 12px;
+        padding: 8px 8px 4px 8px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        border: 1px solid #1f2937;
+    }
+    .chart-title {
+        font-size: 0.9rem;
+        color: #9ca3af;
+        margin: 0 0 4px 4px;
+    }
+    canvas {
+        width: 100% !important;
+        height: 220px !important;
+    }
+    .rain-log-card {
+        background: #020617;
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        border: 1px solid #1f2937;
+        margin-bottom: 12px;
+    }
+    .rain-log-title {
+        margin: 0 0 6px 0;
+        font-size: 0.95rem;
+        color: #9ca3af;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    th, td {
+        padding: 4px 6px;
+        border-bottom: 1px solid #1f2937;
+        text-align: left;
+    }
+    th {
+        color: #9ca3af;
+        font-weight: 500;
+    }
+    .no-events {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .clock {
+        text-align: center;
+        margin-top: 4px;
+        font-size: 0.95rem;
+        color: #9ca3af;
+    }
+    footer {
+        text-align: center;
+        font-size: 0.8rem;
+        color: #64748b;
+        margin: 10px 0 16px 0;
+    }
+    @media (max-width: 600px) {
+        .summary-card {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .charts-grid {
+            grid-template-columns: 1fr;   /* En pantallas chicas: una debajo de otra */
+        }
+        canvas {
+            height: 180px !important;
+        }
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="container">
+
+    <!-- 1. TÍTULO ARRIBA -->
+    <header>
+        <h1>Estación meteorológica IoT con ESP32</h1>
+        <p>Monitoreo ambiental, alarmas y paro de emergencia vía Wi-Fi</p>
+    </header>
+
+    <!-- 2. CARTEL DE EMERGENCIA (SI APLICA) -->
+    <div class="emergency-banner" id="emergencyBanner">
+        <span>⚠ PARO DE EMERGENCIA ACTIVADO.</span> Buzzer y LED estan deshabilitados hasta liberar el boton.
+    </div>
+
+    <!-- 3. TARJETA RESUMEN (TEMPERATURA / HUMEDAD / PRESION / LLUVIA) -->
+    <div class="summary-card">
+        <div class="summary-item">
+            <div class="label">Temperatura</div>
+            <div class="value" id="tempValue">-- &deg;C</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">Humedad</div>
+            <div class="value" id="humValue">-- %</div>
+        </div>
+        <div class="summary-item">
+            <div class="label">Presion</div>
+            <div class="value" id="presValue">-- hPa</div>
+        </div>
+        <div class="summary-item rain-status">
+            <div class="rain-emoji" id="rainEmoji">🌥️</div>
+            <div class="label" id="rainText">Sin datos</div>
+        </div>
+    </div>
+
+    <!-- 4. CONTROLES MANUALES (PUEDEN QUEDARSE AQUI ENTRE RESUMEN Y GRAFICAS) -->
+    <div class="control-card">
+        <p class="control-title">Control manual seguro de salidas</p>
+        <div class="control-buttons">
+            <button id="buzzerBtn" class="control-btn on" onclick="toggleDevice('buzzer')">
+                Buzzer habilitado
+            </button>
+            <button id="ledBtn" class="control-btn on" onclick="toggleDevice('led')">
+                LED habilitado
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. GRAFICAS (LAS TRES EN UNA FILA EN ESCRITORIO) -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <p class="chart-title">Temperatura (&deg;C)</p>
+            <canvas id="tempChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <p class="chart-title">Humedad (%)</p>
+            <canvas id="humChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <p class="chart-title">Presion (hPa)</p>
+            <canvas id="presChart"></canvas>
+        </div>
+    </div>
+
+    <!-- (Opcional) HISTORIAL DE LLUVIA -->
+    <div class="rain-log-card">
+        <p class="rain-log-title">Eventos de lluvia (cuando EMPIEZA a llover)</p>
+        <table id="rainTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Hora de inicio</th>
+                </tr>
+            </thead>
+            <tbody id="rainTableBody"></tbody>
+        </table>
+        <div class="no-events" id="noRainEvents">Aun no se ha registrado ningun evento de lluvia.</div>
+    </div>
+
+    <!-- HORA -->
+    <div class="clock">
+        Hora local del navegador: <span id="clockSpan">--:--:--</span>
+    </div>
+
+    <!-- 6. HASTA ABAJO: INTEGRANTES / MATERIA / FECHA -->
+    <footer>
+        Victor Betancourt · Arquitectura de Computadoras, CUCEI · diciembre 2025
+    </footer>
+
+</div>
+
+<script>
+const maxPoints = 50;
+let labels = [];
+let tempData = [];
+let humData = [];
+let presData = [];
+
+let lastRaining = false;
+let rainEvents = [];
+let sampleIndex = 0;
+
+let buzzerEnabled = true;
+let ledEnabled = true;
+
+function createChart(ctx, label, dataArr) {
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label,
+                data: dataArr,
+                fill: false,
+                tension: 0.25
+            }]
+        },
+        options: {
+            responsive: true,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { display: false } }
+        }
+    });
+}
+
+const tempChart = createChart(document.getElementById('tempChart').getContext('2d'), 'Temp', tempData);
+const humChart  = createChart(document.getElementById('humChart').getContext('2d'),  'Hum', humData);
+const presChart = createChart(document.getElementById('presChart').getContext('2d'), 'Pres', presData);
+
+function addPoint(temp, hum, pres) {
+    labels.push(sampleIndex++);
+    tempData.push(temp);
+    humData.push(hum);
+    presData.push(pres);
+
+    if (labels.length > maxPoints) {
+        labels.shift();
+        tempData.shift();
+        humData.shift();
+        presData.shift();
+    }
+
+    tempChart.update();
+    humChart.update();
+    presChart.update();
+}
+
+function renderRainTable() {
+    const tbody = document.getElementById('rainTableBody');
+    const emptyMsg = document.getElementById('noRainEvents');
+    tbody.innerHTML = '';
+
+    if (rainEvents.length === 0) {
+        emptyMsg.style.display = 'block';
+        return;
+    }
+    emptyMsg.style.display = 'none';
+
+    rainEvents.forEach((ev, idx) => {
+        const tr = document.createElement('tr');
+        const tdIdx = document.createElement('td');
+        const tdTime = document.createElement('td');
+
+        tdIdx.textContent = idx + 1;
+        tdTime.textContent = ev;
+
+        tr.appendChild(tdIdx);
+        tr.appendChild(tdTime);
+        tbody.appendChild(tr);
+    });
+}
+
+function applyControlUI(emergency) {
+    const buzzerBtn = document.getElementById('buzzerBtn');
+    const ledBtn = document.getElementById('ledBtn');
+
+    buzzerBtn.classList.remove('on', 'off', 'disabled');
+    ledBtn.classList.remove('on', 'off', 'disabled');
+
+    if (emergency) {
+        buzzerBtn.classList.add('disabled');
+        ledBtn.classList.add('disabled');
+        buzzerBtn.disabled = true;
+        ledBtn.disabled = true;
+    } else {
+        buzzerBtn.disabled = false;
+        ledBtn.disabled = false;
+
+        buzzerBtn.classList.add(buzzerEnabled ? 'on' : 'off');
+        ledBtn.classList.add(ledEnabled ? 'on' : 'off');
+
+        buzzerBtn.textContent = buzzerEnabled ? 'Buzzer habilitado' : 'Buzzer deshabilitado';
+        ledBtn.textContent    = ledEnabled    ? 'LED habilitado'    : 'LED deshabilitado';
+    }
+}
+
+async function toggleDevice(kind) {
+    try {
+        const res = await fetch('/control?' + kind + '=toggle');
+        if (!res.ok) return;
+        const d = await res.json();
+        buzzerEnabled = d.buzzer_enabled;
+        ledEnabled = d.led_enabled;
+        // emergency no cambia aquí, solo aspecto de los botones
+        applyControlUI(false);
+    } catch (e) {
+        console.log('Error control', e);
+    }
+}
+
+async function fetchData() {
+    try {
+        const res = await fetch('/data');
+        if (!res.ok) return;
+        const d = await res.json();
+
+        const t = d.temp_dht;
+        const h = d.hum;
+        const p = d.pres_hpa;
+        const raining = d.lluvia;
+        const emergency = d.emergency;
+        buzzerEnabled = d.buzzer_enabled;
+        ledEnabled = d.led_enabled;
+
+        document.getElementById('tempValue').textContent = (t !== null ? t.toFixed(1) : '--') + ' °C';
+        document.getElementById('humValue').textContent  = (h !== null ? h.toFixed(1) : '--') + ' %';
+        document.getElementById('presValue').textContent = (p !== null ? p.toFixed(1) : '--') + ' hPa';
+
+        const rainEmoji = document.getElementById('rainEmoji');
+        const rainText  = document.getElementById('rainText');
+        const emergencyBanner = document.getElementById('emergencyBanner');
+
+        if (emergency) {
+            emergencyBanner.style.display = 'block';
+            rainEmoji.textContent = '🛑';
+            rainText.textContent = 'Paro de emergencia activo';
+        } else {
+            emergencyBanner.style.display = 'none';
+            if (raining) {
+                rainEmoji.textContent = '🌧️';
+                rainText.textContent = 'Esta lloviendo';
+            } else {
+                rainEmoji.textContent = '☀️';
+                rainText.textContent = 'Sin lluvia';
+            }
+        }
+
+        applyControlUI(emergency);
+
+        if (!emergency) {
+            if (raining && !lastRaining) {
+                const ts = new Date().toLocaleTimeString();
+                rainEvents.push(ts);
+                renderRainTable();
+            }
+            lastRaining = raining;
+        }
+
+        if (t !== null && h !== null && p !== null) {
+            addPoint(t, h, p);
+        }
+
+    } catch (e) {
+        console.log('Error fetch data', e);
+    }
+}
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clockSpan').textContent = now.toLocaleTimeString();
+}
+
+setInterval(fetchData, 5000);
+setInterval(updateClock, 1000);
+updateClock();
+fetchData();
+</script>
+</body>
+</html>
