@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/logo.svg" alt="Estación meteorológica ESP32" width="120">
+</p>
+
 # Estación meteorológica con ESP32
 
 Una estación del tamaño de un escritorio: un ESP32 con MicroPython lee temperatura, humedad,

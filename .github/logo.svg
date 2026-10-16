@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Estación meteorológica ESP32">
+  <path fill="#12A5A5" d="M33 2h8v18h-8zM49 2h8v18h-8zM63 2h8v18h-8zM79 2h8v18h-8zM33 100h8v18h-8zM49 100h8v18h-8zM63 100h8v18h-8zM79 100h8v18h-8zM2 33h18v8H2zM2 49h18v8H2zM2 63h18v8H2zM2 79h18v8H2zM100 33h18v8h-18zM100 49h18v8h-18zM100 63h18v8h-18zM100 79h18v8h-18z"/>
+  <rect x="16" y="16" width="88" height="88" rx="12" fill="#12A5A5"/>
+  <g fill="#F4F1E6"><circle cx="47" cy="56" r="12"/><circle cx="64" cy="50" r="15"/><circle cx="77" cy="59" r="10"/><rect x="35" y="56" width="52" height="13" rx="6.5"/></g>
+  <path d="M46 78l-4 9M61 78l-4 9M76 78l-4 9" stroke="#F4F1E6" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="30" cy="30" r="5" fill="#F0A12E"/>
+</svg>
